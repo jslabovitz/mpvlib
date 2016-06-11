@@ -51,7 +51,7 @@ module MPV
         actual_value = value
       end
       loop do
-        event = @mpv.wait_event(1)
+        event = @mpv.wait_event(0.1)
         raise event.error if event.error
         case event
         when MPV::Event::None

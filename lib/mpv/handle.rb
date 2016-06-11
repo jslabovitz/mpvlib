@@ -109,7 +109,7 @@ module MPV
       reply_id
     end
 
-    def wait_event(timeout=nil)
+    def wait_event(timeout=-1)
       event = Event.new_from_mpv_event(MPV.mpv_wait_event(@mpv_handle, timeout))
       #FIXME: handle reply_userdata
       event
