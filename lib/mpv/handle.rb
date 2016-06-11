@@ -43,7 +43,7 @@ module MPV
 
   # int mpv_request_event(mpv_handle *ctx, mpv_event_id event, int enable);
 
-  # int mpv_request_log_messages(mpv_handle *ctx, const char *min_level);
+  attach_function :mpv_request_log_messages, [:mpv_handle, :string], :int
 
   attach_function :mpv_wait_event, [:mpv_handle, :double], MPVEvent.by_ref
 
@@ -113,6 +113,12 @@ module MPV
       event = Event.new_from_mpv_event(MPV.mpv_wait_event(@mpv_handle, timeout))
       #FIXME: handle reply_userdata
       event
+    end
+
+    def request_log_messages(level)
+      MPV::Error.raise_on_failure {
+        MPV.mpv_request_log_messages(@mpv_handle, level)
+      }
     end
 
     private

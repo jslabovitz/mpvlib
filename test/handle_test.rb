@@ -66,6 +66,23 @@ module MPV
       assert { actual_value.to_s.to_f == expected_value }
     end
 
+    def test_log_messages
+      @mpv.request_log_messages('v')
+      @mpv.command('stop')
+      messages = []
+      loop do
+        event = @mpv.wait_event(0.1)
+        raise event.error if event.error
+        case event
+        when MPV::Event::None
+          break
+        when MPV::Event::LogMessage
+          messages << event
+        end
+      end
+      assert { messages.length > 0 }
+    end
+
   end
 
 end
