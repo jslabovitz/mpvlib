@@ -46,41 +46,42 @@ module MPV
       expected_property, expected_value = 'volume', 50.0
       @mpv.set_property(expected_property, expected_value.to_s)
       actual_property = actual_value = nil
-      @mpv.observe_property(expected_property) do |property, value|
-        actual_property = property
-        actual_value = value
+      @mpv.observe_property(expected_property) do |property|
+        actual_property = property.name
+        actual_value = property.value
+        raise MPV::StopEventLoop
       end
-      loop do
-        event = @mpv.wait_event(0.1)
-        raise event.error if event.error
-        case event
-        when MPV::Event::None
-          break
-        when MPV::Event::PropertyChange
-          actual_property = event.name
-          actual_value = event.value
-          break
-        end
+      @mpv.each_event(timeout: 0.1) do |event|
+        # ignore
       end
       assert { actual_property == expected_property }
       assert { actual_value.to_s.to_f == expected_value }
     end
 
-    def test_log_messages
+    def test_wakeup_pipe
       @mpv.request_log_messages('v')
-      @mpv.command('stop')
-      messages = []
+      pipe = @mpv.get_wakeup_pipe
+      state = 0
       loop do
-        event = @mpv.wait_event(0.1)
-        raise event.error if event.error
-        case event
-        when MPV::Event::None
-          break
-        when MPV::Event::LogMessage
-          messages << event
+        ready = IO.select([pipe], [], [], 1)
+        if ready
+          reads = ready.first
+          if reads.include?(pipe)
+            pipe.read_nonblock(1024)
+            @mpv.each_event(timeout: 0) do |event|
+              # ignore
+            end
+          end
+        else
+          case state
+          when 0
+            @mpv.command_async('stop')
+            state += 1
+          when 1
+            break
+          end
         end
       end
-      assert { messages.length > 0 }
     end
 
   end

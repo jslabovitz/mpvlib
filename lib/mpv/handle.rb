@@ -26,7 +26,7 @@ module MPV
   # int mpv_command_node(mpv_handle *ctx, mpv_node *args, mpv_node *result);
   # int mpv_command_string(mpv_handle *ctx, const char *args);
 
-  # int mpv_command_async(mpv_handle *ctx, uint64_t reply_userdata, const char **args);
+  attach_function :mpv_command_async, [:mpv_handle, :uint64, :pointer], :int
   # int mpv_command_node_async(mpv_handle *ctx, uint64_t reply_userdata, mpv_node *args);
 
   # attach_function :mpv_set_property, [:mpv_handle, :string, :mpv_format, :void], :int
@@ -51,12 +51,14 @@ module MPV
 
   # void mpv_set_wakeup_callback(mpv_handle *ctx, void (*cb)(void *d), void *d);
 
-  # int mpv_get_wakeup_pipe(mpv_handle *ctx);
+  attach_function :mpv_get_wakeup_pipe, [:mpv_handle], :int
 
   # void mpv_wait_async_requests(mpv_handle *ctx);
 
   # typedef enum mpv_sub_api
   # void *mpv_get_sub_api(mpv_handle *ctx, mpv_sub_api sub_api);
+
+  class StopEventLoop < StandardError; end
 
   class Handle < Base
 
@@ -64,7 +66,7 @@ module MPV
 
     def initialize
       @mpv_handle = MPV.mpv_create
-      @property_observers = {}
+      @observers = {}
       @reply_id = 1
       MPV::Error.raise_on_failure {
         MPV.mpv_initialize(@mpv_handle)
@@ -86,6 +88,15 @@ module MPV
       }
     end
 
+    def command_async(*args, &block)
+      reply_id = next_reply_id
+      MPV::Error.raise_on_failure {
+        MPV.mpv_command_async(@mpv_handle, reply_id, FFI::MemoryPointer.from_array_of_strings(args))
+      }
+      @observers[reply_id] = block
+      reply_id
+    end
+
     # FIXME: allow non-string values
 
     def set_property(name, data)
@@ -105,14 +116,38 @@ module MPV
       MPV::Error.raise_on_failure {
         MPV.mpv_observe_property(@mpv_handle, reply_id, name, :MPV_FORMAT_STRING)
       }
-      @property_observers[reply_id] = block
+      @observers[reply_id] = block
       reply_id
     end
 
-    def wait_event(timeout=-1)
-      event = Event.new_from_mpv_event(MPV.mpv_wait_event(@mpv_handle, timeout))
-      #FIXME: handle reply_userdata
-      event
+    def wait_event(timeout: -1)
+      Event.new_from_mpv_event(MPV.mpv_wait_event(@mpv_handle, timeout))
+    end
+
+    def each_event(timeout: -1, raise_on_error: true, &block)
+      loop do
+        event = wait_event(timeout: timeout)
+        raise event.error if raise_on_error && event.error
+        break if event.kind_of?(MPV::Event::None)
+        begin
+          if event.reply_id
+            observer = @observers[event.reply_id]
+            if observer
+              observer.call(event)
+            end
+          else
+            yield(event)
+          end
+        rescue StopEventLoop
+          break
+        end
+      end
+    end
+
+    def get_wakeup_pipe
+      fd = MPV.mpv_get_wakeup_pipe(@mpv_handle)
+      raise StandardError, "Couldn't get wakeup pipe from MPV" if fd < 0
+      IO.new(fd)
     end
 
     def request_log_messages(level)
