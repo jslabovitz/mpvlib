@@ -1,6 +1,6 @@
 module MPV
 
-  enum :mpv_event_id, [
+  MPVEventID = enum :mpv_event_id, [
     :MPV_EVENT_NONE,                  0,
     :MPV_EVENT_SHUTDOWN,              1,
     :MPV_EVENT_LOG_MESSAGE,           2,
@@ -29,6 +29,10 @@ module MPV
   ]
 
   attach_function :mpv_event_name, [:mpv_event_id], :string
+
+  MPVEventNames = Hash[
+    MPVEventID.to_hash.map { |symbol, value| [MPV.mpv_event_name(value), symbol] }
+  ]
 
   class MPVEventProperty < FFI::Struct
 
@@ -204,10 +208,12 @@ module MPV
       event_class.new(mpv_event)
     end
 
+    attr_accessor :event_id
     attr_accessor :error
     attr_accessor :reply_id
 
     def initialize(mpv_event)
+      @event_id = mpv_event[:event_id]
       @error = (mpv_event[:error] < 0) ? MPV::Error.new(mpv_event[:error]) : nil
       @reply_id = mpv_event[:reply_userdata]
     end
