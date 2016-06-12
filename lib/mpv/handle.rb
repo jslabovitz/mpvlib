@@ -66,7 +66,8 @@ module MPV
 
     def initialize
       @mpv_handle = MPV.mpv_create
-      @observers = {}
+      @property_observers = {}
+      @event_observers = {}
       @reply_id = 1
       MPV::Error.raise_on_failure {
         MPV.mpv_initialize(@mpv_handle)
@@ -93,7 +94,7 @@ module MPV
       MPV::Error.raise_on_failure {
         MPV.mpv_command_async(@mpv_handle, reply_id, FFI::MemoryPointer.from_array_of_strings(args))
       }
-      @observers[reply_id] = block
+      @property_observers[reply_id] = block
       reply_id
     end
 
@@ -116,8 +117,15 @@ module MPV
       MPV::Error.raise_on_failure {
         MPV.mpv_observe_property(@mpv_handle, reply_id, name, :MPV_FORMAT_STRING)
       }
-      @observers[reply_id] = block
+      @property_observers[reply_id] = block
       reply_id
+    end
+
+    def register_event(name, &block)
+      event_id = MPVEventNames[name] or raise "No such event: #{name.inspect}"
+      @event_observers[event_id] ||= []
+      @event_observers[event_id] << block
+      # ;;pp(name: name, block: block, event_id: event_id, observers: @event_observers)
     end
 
     def wait_event(timeout: -1)
@@ -130,11 +138,15 @@ module MPV
         raise event.error if raise_on_error && event.error
         break if event.kind_of?(MPV::Event::None)
         begin
-          if event.reply_id
-            observer = @observers[event.reply_id]
+          # ;;pp(event_id: event.event_id, observers: @event_observers[event.event_id])
+          if event.reply_id && event.reply_id != 0
+            observer = @property_observers[event.reply_id]
             if observer
               observer.call(event)
             end
+          elsif (observers = @event_observers[event.event_id])
+            # ;;warn "sending #{event.event_id} to #{observers.join.inspect}"
+            observers.each { |o| o.call(event) }
           else
             yield(event)
           end
