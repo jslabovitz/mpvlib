@@ -21,14 +21,18 @@ module MPV
   attach_function :mpv_free, [:void], :void
 
   def self.convert_data(data, format)
-    ptr = data.read_pointer
-    case format
-    when :MPV_FORMAT_NONE
+    begin
+      ptr = data.read_pointer
+      case format
+      when :MPV_FORMAT_NONE
+        nil
+      when :MPV_FORMAT_STRING, :MPV_FORMAT_OSD_STRING
+        ptr.read_string
+      else
+        raise "Unknown format: #{format.inspect}"
+      end
+    rescue FFI::NullPointerError
       nil
-    when :MPV_FORMAT_STRING, :MPV_FORMAT_OSD_STRING
-      ptr.read_string
-    else
-      raise "Unknown format: #{format.inspect}"
     end
   end
 
