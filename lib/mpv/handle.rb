@@ -103,17 +103,15 @@ module MPV
       reply_id
     end
 
-    # FIXME: allow non-string values
-
     def set_property(name, data)
+      #FIXME: allow non-string values
       MPV::Error.raise_on_failure {
         MPV.mpv_set_property_string(@mpv_handle, name, data.to_s)
       }
     end
 
-    # FIXME: allow non-string values
-
     def get_property(name)
+      #FIXME: allow non-string values
       MPV.mpv_get_property_string(@mpv_handle, name)
     end
 
@@ -130,7 +128,6 @@ module MPV
       event_id = MPVEventNames[name] or raise "No such event: #{name.inspect}"
       @event_observers[event_id] ||= []
       @event_observers[event_id] << block
-      # ;;pp(name: name, block: block, event_id: event_id, observers: @event_observers)
     end
 
     def wait_event(timeout: -1)
@@ -143,14 +140,12 @@ module MPV
         raise event.error if raise_on_error && event.error
         break if event.kind_of?(MPV::Event::None)
         begin
-          # ;;pp(event_id: event.event_id, observers: @event_observers[event.event_id])
           if event.reply_id && event.reply_id != 0
             observer = @property_observers[event.reply_id]
             if observer
               observer.call(event)
             end
           elsif (observers = @event_observers[event.event_id])
-            # ;;warn "sending #{event.event_id} to #{observers.join.inspect}"
             observers.each { |o| o.call(event) }
           else
             yield(event)
