@@ -19,7 +19,7 @@ module MPV
   attach_function :mpv_get_time_us, [:mpv_handle], :int64
 
   # int mpv_set_option(mpv_handle *ctx, const char *name, mpv_format format, void *data);
-  # int mpv_set_option_string(mpv_handle *ctx, const char *name, const char *data);
+  attach_function :mpv_set_option_string, [:mpv_handle, :string, :string], :int
 
   attach_function :mpv_command, [:mpv_handle, :pointer], :int
 
@@ -81,6 +81,11 @@ module MPV
 
     def get_time_us
       MPV.mpv_get_time_us(@mpv_handle)
+    end
+
+    def set_option(name, value)
+      #FIXME: allow non-string values
+      MPV.mpv_set_option_string(@mpv_handle, name, value.to_s)
     end
 
     def command(*args)
