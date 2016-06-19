@@ -90,14 +90,14 @@ module MPV
 
     def command(*args)
       MPV::Error.raise_on_failure {
-        MPV.mpv_command(@mpv_handle, FFI::MemoryPointer.from_array_of_strings(args))
+        MPV.mpv_command(@mpv_handle, FFI::MemoryPointer.from_array_of_strings(args.map(&:to_s)))
       }
     end
 
     def command_async(*args, &block)
       reply_id = next_reply_id
       MPV::Error.raise_on_failure {
-        MPV.mpv_command_async(@mpv_handle, reply_id, FFI::MemoryPointer.from_array_of_strings(args))
+        MPV.mpv_command_async(@mpv_handle, reply_id, FFI::MemoryPointer.from_array_of_strings(args.map(&:to_s)))
       }
       @property_observers[reply_id] = block
       reply_id
