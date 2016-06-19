@@ -131,29 +131,25 @@ module MPV
     end
 
     def wait_event(timeout: -1)
-      Event.new_from_mpv_event(MPV.mpv_wait_event(@mpv_handle, timeout))
-    end
-
-    def each_event(timeout: -1, raise_on_error: true, &block)
+      event = nil
       loop do
-        event = wait_event(timeout: timeout)
-        raise event.error if raise_on_error && event.error
-        break if event.kind_of?(MPV::Event::None)
-        begin
-          if event.reply_id && event.reply_id != 0
-            observer = @property_observers[event.reply_id]
-            if observer
-              observer.call(event)
-            end
-          elsif (observers = @event_observers[event.event_id])
-            observers.each { |o| o.call(event) }
-          else
-            yield(event)
+        event = Event.new_from_mpv_event(MPV.mpv_wait_event(@mpv_handle, timeout))
+        raise event.error if event.error
+        if event.kind_of?(MPV::Event::None)
+          event = nil
+          break
+        elsif event.reply_id && event.reply_id != 0
+          if (observer = @property_observers[event.reply_id])
+            observer.call(event)
           end
-        rescue StopEventLoop
+        else
           break
         end
       end
+      if event && (observers = @event_observers[event.event_id])
+        observers.each { |o| o.call(event) }
+      end
+      event
     end
 
     def get_wakeup_pipe
