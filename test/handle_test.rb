@@ -46,13 +46,14 @@ module MPV
       expected_property, expected_value = 'volume', 50.0
       @mpv.set_property(expected_property, expected_value.to_s)
       actual_property = actual_value = nil
+      stop = false
       @mpv.observe_property(expected_property) do |property|
         actual_property = property.name
         actual_value = property.value
-        raise MPV::StopEventLoop
+        stop = true
       end
-      @mpv.each_event(timeout: 0.1) do |event|
-        # ignore
+      until stop
+        @mpv.wait_event(timeout: 0.1)
       end
       assert { actual_property == expected_property }
       assert { actual_value.to_s.to_f == expected_value }
@@ -68,9 +69,7 @@ module MPV
           reads = ready.first
           if reads.include?(pipe)
             pipe.read_nonblock(1024)
-            @mpv.each_event(timeout: 0) do |event|
-              # ignore
-            end
+            @mpv.wait_event(timeout: 0)
           end
         else
           case state
