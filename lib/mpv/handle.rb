@@ -58,8 +58,6 @@ module MPV
   # typedef enum mpv_sub_api
   # void *mpv_get_sub_api(mpv_handle *ctx, mpv_sub_api sub_api);
 
-  class StopEventLoop < StandardError; end
-
   class Handle < Base
 
     attr_reader :mpv_handle
