@@ -67,7 +67,8 @@ module MPV
       @property_observers = {}
       @event_observers = {}
       @reply_id = 1
-      MPV::Error.raise_on_failure {
+      @wakeup_pipe = nil
+      MPV::Error.raise_on_failure("initialize") {
         MPV.mpv_initialize(@mpv_handle)
       }
       define_finalizer(:mpv_terminate_destroy, @mpv_handle)
@@ -87,14 +88,14 @@ module MPV
     end
 
     def command(*args)
-      MPV::Error.raise_on_failure("command: #{args.inspect}") {
+      MPV::Error.raise_on_failure("command: args = %p" % args) {
         MPV.mpv_command(@mpv_handle, FFI::MemoryPointer.from_array_of_strings(args.map(&:to_s)))
       }
     end
 
     def command_async(*args, &block)
       reply_id = next_reply_id
-      MPV::Error.raise_on_failure {
+      MPV::Error.raise_on_failure("command_async: args = %p" % args) {
         MPV.mpv_command_async(@mpv_handle, reply_id, FFI::MemoryPointer.from_array_of_strings(args.map(&:to_s)))
       }
       @property_observers[reply_id] = block
@@ -103,7 +104,7 @@ module MPV
 
     def set_property(name, data)
       #FIXME: allow non-string values
-      MPV::Error.raise_on_failure {
+      MPV::Error.raise_on_failure("set_property: name = %p, data = %p" % [name, data]) {
         MPV.mpv_set_property_string(@mpv_handle, name, data.to_s)
       }
     end
@@ -115,7 +116,7 @@ module MPV
 
     def observe_property(name, &block)
       reply_id = next_reply_id
-      MPV::Error.raise_on_failure {
+      MPV::Error.raise_on_failure("set_property: name = %p" % name) {
         MPV.mpv_observe_property(@mpv_handle, reply_id, name, :MPV_FORMAT_STRING)
       }
       @property_observers[reply_id] = block
