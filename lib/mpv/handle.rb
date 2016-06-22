@@ -129,32 +129,31 @@ module MPV
       @event_observers[event_id] << block
     end
 
-    def wait_event(timeout: -1)
-      event = nil
+    def wait_event(timeout: nil)
+      Event.new_from_mpv_event(MPV.mpv_wait_event(@mpv_handle, timeout || -1))
+    end
+
+    def event_loop(timeout: nil)
       loop do
-        event = Event.new_from_mpv_event(MPV.mpv_wait_event(@mpv_handle, timeout))
+        event = wait_event(timeout: timeout)
+        break if event.kind_of?(MPV::Event::None)
         raise event.error if event.error
-        if event.kind_of?(MPV::Event::None)
-          event = nil
-          break
-        elsif event.reply_id && event.reply_id != 0
-          if (observer = @property_observers[event.reply_id])
-            observer.call(event)
-          end
-        else
-          break
+        if event.reply_id && event.reply_id != 0 && (observer = @property_observers[event.reply_id])
+          observer.call(event)
+        end
+        if (observers = @event_observers[event.event_id])
+          observers.each { |o| o.call(event) }
         end
       end
-      if event && (observers = @event_observers[event.event_id])
-        observers.each { |o| o.call(event) }
-      end
-      event
     end
 
     def get_wakeup_pipe
-      fd = MPV.mpv_get_wakeup_pipe(@mpv_handle)
-      raise StandardError, "Couldn't get wakeup pipe from MPV" if fd < 0
-      IO.new(fd)
+      unless @wakeup_pipe
+        fd = MPV.mpv_get_wakeup_pipe(@mpv_handle)
+        raise StandardError, "Couldn't get wakeup pipe from MPV" if fd < 0
+        @wakeup_pipe = IO.new(fd)
+      end
+      @wakeup_pipe
     end
 
     def request_log_messages(level)
