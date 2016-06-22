@@ -37,7 +37,7 @@ module MPV
     end
 
     def initialize(error, msg=nil)
-      super('MPV error: %s (%d): %s' %
+      super('MPV error: %s (%s): %s' %
         [
           self.class.error_to_string(error),
           error,
