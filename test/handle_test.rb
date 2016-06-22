@@ -24,9 +24,7 @@ module MPV
     end
 
     def test_bad_command
-      # FIXME: why doesn't this raise the right kind of error?
-      # assert_raises(MPV::Error) {
-      assert_raises(RuntimeError) {
+      assert_raises(MPV::Error) {
         @mpv.command('xyzzy')
         true
       }
@@ -53,32 +51,24 @@ module MPV
         stop = true
       end
       until stop
-        @mpv.wait_event(timeout: 0.1)
+        @mpv.event_loop(timeout: 0)
       end
       assert { actual_property == expected_property }
       assert { actual_value.to_s.to_f == expected_value }
     end
 
-    def test_wakeup_pipe
-      @mpv.request_log_messages('v')
-      pipe = @mpv.get_wakeup_pipe
-      state = 0
-      loop do
-        ready = IO.select([pipe], [], [], 1)
-        if ready
-          reads = ready.first
-          if reads.include?(pipe)
-            pipe.read_nonblock(1024)
-            @mpv.wait_event(timeout: 0)
-          end
+    def test_process_events
+      stop = false
+      @mpv.request_log_messages('v') do |event|
+        stop = true if event.text =~ /Set property string/
+      end
+      @mpv.set_property('volume', 50.0)
+      until stop
+        if (IO.select([@mpv.get_wakeup_pipe], [], [], 1))
+          @mpv.get_wakeup_pipe.read_nonblock(1024)
+          @mpv.event_loop(timeout: 0)
         else
-          case state
-          when 0
-            @mpv.command_async('stop')
-            state += 1
-          when 1
-            break
-          end
+          raise 'timeout'
         end
       end
     end
