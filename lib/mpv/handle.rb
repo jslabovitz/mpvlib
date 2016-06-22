@@ -87,7 +87,7 @@ module MPV
     end
 
     def command(*args)
-      MPV::Error.raise_on_failure {
+      MPV::Error.raise_on_failure("command: #{args.inspect}") {
         MPV.mpv_command(@mpv_handle, FFI::MemoryPointer.from_array_of_strings(args.map(&:to_s)))
       }
     end

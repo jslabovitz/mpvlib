@@ -27,25 +27,23 @@ module MPV
 
   class Error < StandardError
 
-    def self.raise_on_failure(&block)
+    def self.raise_on_failure(msg=nil, &block)
       error = yield
-      raise new(error) if error && error < 0
+      raise new(error, msg) if error && error < 0
     end
 
     def self.error_to_string(error)
       MPV.mpv_error_string(error)
     end
 
-    def initialize(error)
-      super()
-      @error = error
-    end
-
-    def to_str
-      'MPV error: %s (%d)' % [
-        self.class.error_to_string(@error),
-        @error,
-      ]
+    def initialize(error, msg=nil)
+      super('MPV error: %s (%d): %s' %
+        [
+          self.class.error_to_string(error),
+          error,
+          msg,
+        ]
+      )
     end
 
   end
