@@ -156,10 +156,11 @@ module MPV
       @wakeup_pipe
     end
 
-    def request_log_messages(level)
-      MPV::Error.raise_on_failure {
+    def request_log_messages(level, &block)
+      MPV::Error.raise_on_failure("request_log_messages: level = %p" % level) {
         MPV.mpv_request_log_messages(@mpv_handle, level)
       }
+      register_event('log-message', &block) if block_given?
     end
 
     private
