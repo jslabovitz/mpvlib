@@ -2,6 +2,7 @@ require 'pp'
 require 'path'
 require 'json'
 require 'hashstruct'
+require 'logger'
 require 'ffi'
 require 'mpvlib/ffi_additions'
 
