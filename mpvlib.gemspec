@@ -18,6 +18,9 @@ Gem::Specification.new do |spec|
   spec.require_paths = ['lib']
 
   spec.add_dependency 'ffi'
+  spec.add_dependency 'json'
+  spec.add_dependency 'hashstruct'
+  spec.add_dependency 'path'
 
   spec.add_development_dependency 'bundler'
   spec.add_development_dependency 'rake'

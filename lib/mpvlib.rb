@@ -1,4 +1,7 @@
 require 'pp'
+require 'path'
+require 'json'
+require 'hashstruct'
 require 'ffi'
 require 'mpvlib/ffi_additions'
 

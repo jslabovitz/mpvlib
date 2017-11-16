@@ -60,18 +60,47 @@ module MPV
 
   class Handle < Base
 
-    attr_reader :mpv_handle
+    attr_accessor :playlist_file
+    attr_accessor :audio_device
+    attr_accessor :mpv_log_level
+    attr_accessor :equalizer
+    attr_accessor :delegate
+    attr_reader   :wakeup_pipe
 
-    def initialize
-      @mpv_handle = MPV.mpv_create
+    def initialize(
+      playlist_file: nil,
+      audio_device: nil,
+      mpv_log_level: nil,
+      equalizer: nil,
+      delegate:,
+      **params
+    )
+      @playlist_file = Path.new(playlist_file || '/tmp/playlist.txt')
+      @audio_device = audio_device
+      @mpv_log_level = mpv_log_level || 'error'
+      @equalizer = equalizer
+      @delegate = delegate
       @property_observers = {}
       @event_observers = {}
       @reply_id = 1
-      @wakeup_pipe = nil
+      @mpv_handle = MPV.mpv_create
       MPV::Error.raise_on_failure("initialize") {
         MPV.mpv_initialize(@mpv_handle)
       }
       define_finalizer(:mpv_terminate_destroy, @mpv_handle)
+      fd = MPV.mpv_get_wakeup_pipe(@mpv_handle)
+      raise StandardError, "Couldn't get wakeup pipe from MPV" if fd < 0
+      @wakeup_pipe = IO.new(fd)
+      register_event('log-message') { |e| handle_log_message(e) }
+      request_log_messages(@mpv_log_level)
+      set_option('audio-device', @audio_device) if @audio_device
+      command('af', 'add', "equalizer=#{@equalizer.join(':')}") if @equalizer
+      set_option('audio-display', 'no')
+      set_option('vo', 'null')
+      set_property('volume', '100')
+      observe_property('playlist') { |e| @delegate.playlist_changed(e) }
+      observe_property('pause') { |e| @delegate.pause_changed(e) }
+      register_event('playback-restart') { |e| @delegate.playback_restart(e) }
     end
 
     def client_name
@@ -94,12 +123,12 @@ module MPV
     end
 
     def command_async(*args, &block)
-      reply_id = next_reply_id
+      @reply_id += 1
       MPV::Error.raise_on_failure("command_async: args = %p" % args) {
-        MPV.mpv_command_async(@mpv_handle, reply_id, FFI::MemoryPointer.from_array_of_strings(args.map(&:to_s)))
+        MPV.mpv_command_async(@mpv_handle, @reply_id, FFI::MemoryPointer.from_array_of_strings(args.map(&:to_s)))
       }
-      @property_observers[reply_id] = block
-      reply_id
+      @property_observers[@reply_id] = block
+      @reply_id
     end
 
     def set_property(name, data)
@@ -115,12 +144,12 @@ module MPV
     end
 
     def observe_property(name, &block)
-      reply_id = next_reply_id
+      @reply_id += 1
       MPV::Error.raise_on_failure("set_property: name = %p" % name) {
-        MPV.mpv_observe_property(@mpv_handle, reply_id, name, :MPV_FORMAT_STRING)
+        MPV.mpv_observe_property(@mpv_handle, @reply_id, name, :MPV_FORMAT_STRING)
       }
-      @property_observers[reply_id] = block
-      reply_id
+      @property_observers[@reply_id] = block
+      @reply_id
     end
 
     def register_event(name, &block)
@@ -147,13 +176,9 @@ module MPV
       end
     end
 
-    def get_wakeup_pipe
-      unless @wakeup_pipe
-        fd = MPV.mpv_get_wakeup_pipe(@mpv_handle)
-        raise StandardError, "Couldn't get wakeup pipe from MPV" if fd < 0
-        @wakeup_pipe = IO.new(fd)
-      end
-      @wakeup_pipe
+    def run_event_loop
+      @wakeup_pipe.read_nonblock(1024)
+      event_loop(timeout: 0)
     end
 
     def request_log_messages(level, &block)
@@ -163,10 +188,98 @@ module MPV
       register_event('log-message', &block) if block_given?
     end
 
-    private
+    def playlist_position
+      (v = get_property('playlist-pos')) && v.to_i
+    end
 
-    def next_reply_id
-      @reply_id += 1
+    def playlist_position=(position)
+      set_property('playlist-pos', position)
+    end
+
+    def playlist_count
+      (v = get_property('playlist/count')) && v.to_i
+    end
+
+    def time_position
+      (v = get_property('time-pos')) && v.to_f
+    end
+
+    def time_position=(position)
+      set_property('time-pos', position)
+    end
+
+    def loadlist(path)
+      command('loadlist', path.to_s)
+    end
+
+    def playlist_previous
+      command('playlist-prev')
+    end
+
+    def playlist_next
+      command('playlist-next')
+    end
+
+    def pause
+      case get_property('pause')
+      when 'no', nil
+        false
+      when 'yes'
+        true
+      end
+    end
+
+    def pause=(state)
+      set_property('pause', state ? 'yes' : 'no')
+    end
+
+    def seek_by(seconds)
+      command('seek', seconds)
+    end
+
+    def seek_to_percent(percent)
+      command('seek', percent, 'absolute-percent')
+    end
+
+    def playlist_filename(position)
+      if (filename = get_property("playlist/#{position}/filename")) && !filename.empty?
+        Path.new(filename)
+      else
+        nil
+      end
+    end
+
+    def playlist
+      JSON.parse(get_property('playlist')).map { |h| HashStruct.new(h) }
+    end
+
+    def play(playlist=nil)
+      if playlist
+        @playlist_file.dirname.mkpath
+        @playlist_file.open('w') do |io|
+          playlist.each { |p| io.puts(p) }
+        end
+      end
+      loadlist(@playlist_file)
+    end
+
+    MPVLogMessageLevels = {
+      'none'  => Logger::UNKNOWN,
+      'fatal' => Logger::FATAL,
+      'error' => Logger::ERROR,
+      'warn'  => Logger::WARN,
+      'info'  => Logger::INFO,
+      'v'     => Logger::DEBUG,
+      'debug' => Logger::DEBUG,
+      'trace' => Logger::DEBUG,
+    }
+
+    def handle_log_message(log_message)
+      severity = MPVLogMessageLevels[log_message.level] || Logger::UNKNOWN
+      @delegate.add_log_message(
+        severity,
+        '%15s: %s' % [log_message.prefix, log_message.text.chomp],
+        'MPV')
     end
 
   end
