@@ -16,7 +16,7 @@ module MPV
 
 end
 
-require 'mpvlib/version'
+require 'mpvlib/client_api_version'
 require 'mpvlib/data'
 require 'mpvlib/error'
 require 'mpvlib/event'
