@@ -1,29 +1,31 @@
-# coding: utf-8
-# lib = File.expand_path('../lib', __FILE__)
-# $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
+#encoding: utf-8
+
+require_relative 'lib/mpvlib/version'
 
 Gem::Specification.new do |spec|
-  spec.name          = 'mpvlib'
-  spec.version       = '0.1'
-  spec.authors       = ['John Labovitz']
-  spec.email         = ['johnl@johnlabovitz.com']
+  s.name          = 'mpvlib'
+  s.version       = MPV::VERSION
+  s.summary       = %q{Ruby bindings to the MPV media player, via libmpv.}
+  s.description   = %q{
+    mpvlib provides Ruby bindings to the MPV media player, via libmpv.
+  }
+  s.author        = 'John Labovitz'
+  s.email         = 'johnl@johnlabovitz.com'
+  s.homepage      = 'http://github.com/jslabovitz/mpvlib'
+  s.license       = 'MIT'
 
-  spec.summary       = %q{Ruby bindings to the MPV media player, via libmpv.}
-  # spec.description   = %q{}
-  spec.homepage      = 'http://github.com/jslabovitz/mpvlib'
-  spec.license       = 'MIT'
+  s.files         = `git ls-files`.split("\n")
+  s.test_files    = `git ls-files -- {test,spec,features}/*`.split("\n")
+  s.executables   = `git ls-files -- bin/*`.split("\n").map { |f| File.basename(f) }
+  s.require_path  = 'lib'
 
-  spec.files         = `git ls-files`.split("\n").reject { |f| f.match(%r{^(test)/}) }
-  spec.test_files    = `git ls-files -- test/*`.split("\n")
-  spec.require_paths = ['lib']
+  s.add_dependency 'ffi', '~> 1.19'
+  s.add_dependency 'json', '~> 2.1'
+  s.add_dependency 'hashstruct', '~> 1.3'
+  s.add_dependency 'path', '~> 2.0'
 
-  spec.add_dependency 'ffi'
-  spec.add_dependency 'json'
-  spec.add_dependency 'hashstruct'
-  spec.add_dependency 'path'
-
-  spec.add_development_dependency 'bundler'
-  spec.add_development_dependency 'rake'
-  spec.add_development_dependency 'minitest'
-  spec.add_development_dependency 'minitest-power_assert'
+  s.add_development_dependency 'rake', '~> 12.3'
+  s.add_development_dependency 'rubygems-tasks', '~> 0.2'
+  s.add_development_dependency 'minitest'
+  s.add_development_dependency 'minitest-power_assert'
 end

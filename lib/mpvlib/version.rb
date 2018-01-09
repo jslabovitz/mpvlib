@@ -1,5 +1,7 @@
 module MPV
 
+  VERSION = '0.1'
+
   attach_function :mpv_client_api_version, [], :uint32
 
   def self.client_api_version
