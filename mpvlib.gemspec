@@ -2,7 +2,7 @@
 
 require_relative 'lib/mpvlib/version'
 
-Gem::Specification.new do |spec|
+Gem::Specification.new do |s|
   s.name          = 'mpvlib'
   s.version       = MPV::VERSION
   s.summary       = %q{Ruby bindings to the MPV media player, via libmpv.}
