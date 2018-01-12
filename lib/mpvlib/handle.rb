@@ -72,7 +72,7 @@ module MPV
       audio_device: nil,
       mpv_log_level: nil,
       equalizer: nil,
-      delegate:,
+      delegate: nil,
       **params
     )
       @playlist_file = Path.new(playlist_file || '/tmp/playlist.txt')
@@ -98,9 +98,9 @@ module MPV
       set_option('audio-display', 'no')
       set_option('vo', 'null')
       set_property('volume', '100')
-      observe_property('playlist') { |e| @delegate.playlist_changed(e) }
-      observe_property('pause') { |e| @delegate.pause_changed(e) }
-      register_event('playback-restart') { |e| @delegate.playback_restart(e) }
+      observe_property('playlist') { |e| @delegate.playlist_changed(e) } if @delegate
+      observe_property('pause') { |e| @delegate.pause_changed(e) } if @delegate
+      register_event('playback-restart') { |e| @delegate.playback_restart(e) } if @delegate
     end
 
     def client_name
@@ -275,11 +275,12 @@ module MPV
     }
 
     def handle_log_message(log_message)
-      severity = MPVLogMessageLevels[log_message.level] || Logger::UNKNOWN
-      @delegate.add_log_message(
-        severity,
-        '%15s: %s' % [log_message.prefix, log_message.text.chomp],
-        'MPV')
+      if @delegate
+        @delegate.add_log_message(
+          MPVLogMessageLevels[log_message.level] || Logger::UNKNOWN,
+          '%15s: %s' % [log_message.prefix, log_message.text.chomp],
+          'MPV')
+      end
     end
 
   end
