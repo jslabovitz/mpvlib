@@ -257,7 +257,10 @@ module MPV
       if playlist
         @playlist_file.dirname.mkpath
         @playlist_file.open('w') do |io|
-          playlist.each { |p| io.puts(p) }
+          playlist.each { |p|
+            raise "Track in playlist not defined or nonexistant: #{p.inspect}" unless p && p.exist?
+            io.puts(p)
+          }
         end
       end
       loadlist(@playlist_file)
